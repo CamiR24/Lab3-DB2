@@ -286,6 +286,69 @@ db.accounts.aggregate([
 
 
 //ejercicio 2.9
+db.customers.aggregate([
+
+  { $unwind: "$accounts" },
+
+  
+  {
+    $lookup: {
+      from: "transactions",
+      localField: "accounts",
+      foreignField: "account_id",
+      as: "tx"
+    }
+  },
+  { $unwind: "$tx" },
+  { $unwind: "$tx.transactions" },
+
+
+  {
+    $addFields: {
+      signed_amount: {
+        $cond: [
+          { $eq: ["$tx.transactions.transaction_code", "sell"] },
+          { $toDouble: "$tx.transactions.total" },
+          { $multiply: [ { $toDouble: "$tx.transactions.total" }, -1 ] }
+        ]
+      }
+    }
+  },
+
+
+  {
+    $group: {
+      _id: {
+        name: "$name",
+        email: "$email"
+      },
+      total_balance: { $sum: "$signed_amount" },
+      transaction_count: { $sum: 1 }
+    }
+  },
+
+
+  {
+    $match: {
+      total_balance: { $gt: 30000 },
+      transaction_count: { $gt: 5 }
+    }
+  },
+
+
+  {
+    $project: {
+      _id: 0,
+      name: "$_id.name",
+      email: "$_id.email",
+      total_balance: { $round: ["$total_balance", 2] },
+      transaction_count: 1
+    }
+  },
+
+  { $out: "high_value_customers" }
+
+])
 
 //ejercicio 2.10
 
