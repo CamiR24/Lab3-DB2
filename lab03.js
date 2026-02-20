@@ -164,3 +164,101 @@
     }
   }
 ]
+
+//ejercicio 2.3
+[
+  {
+    '$lookup': {
+      'from': 'transactions', 
+      'localField': 'accounts', 
+      'foreignField': 'account_id', 
+      'as': 'transactions_info'
+    }
+  }, {
+    '$unwind': {
+      'path': '$transactions_info'
+    }
+  }, {
+    '$unwind': {
+      'path': '$transactions_info.transactions'
+    }
+  }, {
+    '$group': {
+      '_id': {
+        'customer_id': '$_id', 
+        'name': '$name', 
+        'address': '$address'
+      }, 
+      'total_buys': {
+        '$sum': {
+          '$cond': [
+            {
+              '$eq': [
+                '$transactions_info.transactions.transaction_code', 'buy'
+              ]
+            }, {
+              '$toDouble': '$transactions_info.transactions.total'
+            }, 0
+          ]
+        }
+      }, 
+      'total_sells': {
+        '$sum': {
+          '$cond': [
+            {
+              '$eq': [
+                '$transactions_info.transactions.transaction_code', 'sell'
+              ]
+            }, {
+              '$toDouble': '$transactions_info.transactions.total'
+            }, 0
+          ]
+        }
+      }
+    }
+  }, {
+    '$project': {
+      '_id': 0, 
+      'name': '$_id.name', 
+      'city': {
+        '$trim': {
+          'input': {
+            '$arrayElemAt': [
+              {
+                '$split': [
+                  '$_id.address', ','
+                ]
+              }, 1
+            ]
+          }
+        }
+      }, 
+      'total_balance': {
+        '$subtract': [
+          '$total_sells', '$total_buys'
+        ]
+      }
+    }
+  }, {
+    '$sort': {
+      'total_balance': -1
+    }
+  }, {
+    '$group': {
+      '_id': '$city', 
+      'name': {
+        '$first': '$name'
+      }, 
+      'total_balance': {
+        '$first': '$total_balance'
+      }
+    }
+  }, {
+    '$project': {
+      '_id': 0, 
+      'city': '$_id', 
+      'name': 1, 
+      'total_balance': 1
+    }
+  }
+]
