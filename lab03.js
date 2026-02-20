@@ -263,6 +263,64 @@
   }
 ]
 
+//ejercicio 2.4
+var maxDate = db.transactions.aggregate([
+  { $unwind: "$transactions" },
+  { $group: { _id: null, maxDate: { $max: "$transactions.date" } } }
+]).toArray()[0].maxDate
+
+db.transactions.aggregate([
+
+  { $unwind: "$transactions" },
+
+  {
+    $match: {
+      "transactions.date": {
+        $gte: new Date(
+          maxDate.getFullYear(),
+          maxDate.getMonth() - 6,
+          maxDate.getDate()
+        )
+      }
+    }
+  },
+
+  {
+    $addFields: {
+      amount: { $toDouble: "$transactions.total" }
+    }
+  },
+
+  { $sort: { amount: -1 } },
+
+  { $limit: 10 },
+
+  {
+    $lookup: {
+      from: "customers",
+      localField: "account_id",
+      foreignField: "accounts",
+      as: "customer"
+    }
+  },
+
+  { $unwind: "$customer" },
+
+  {
+    $project: {
+      _id: 0,
+      date: "$transactions.date",
+      transaction_code: "$transactions.transaction_code",
+      amount: { $round: ["$amount", 2] },
+      name: "$customer.name",
+      email: "$customer.email",
+      birthdate: "$customer.birthdate"
+    }
+  }
+
+], { allowDiskUse: true })
+
+
 //ejercicio 2.8
 db.accounts.aggregate([
   { $unwind: "$products" },
