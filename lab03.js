@@ -262,3 +262,106 @@
     }
   }
 ]
+
+//ejercicio 2.8
+db.accounts.aggregate([
+  { $unwind: "$products" },
+  {
+    $group: {
+      _id: "$products",
+      total_accounts: { $sum: 1 },
+      average_limit: { $avg: "$limit" }
+    }
+  },
+  {
+    $project: {
+      _id: 0,
+      account_type: "$_id",
+      total_accounts: 1,
+      average_limit: { $round: ["$average_limit", 2] }
+    }
+  },
+  { $out: "account_summaries" }
+])
+
+
+//ejercicio 2.9
+
+//ejercicio 2.10
+
+var maxDate = db.transactions.aggregate([
+  { $unwind: "$transactions" },
+  { $group: { _id: null, maxDate: { $max: "$transactions.date" } } }
+]).toArray()[0].maxDate
+
+
+db.customers.aggregate([
+
+  { $unwind: "$accounts" },
+
+  {
+    $lookup: {
+      from: "transactions",
+      localField: "accounts",
+      foreignField: "account_id",
+      as: "tx"
+    }
+  },
+
+  { $unwind: "$tx" },
+  { $unwind: "$tx.transactions" },
+
+  {
+    $match: {
+      "tx.transactions.date": {
+        $gte: new Date(maxDate.getFullYear()-1, maxDate.getMonth(), maxDate.getDate())
+      }
+    }
+  },
+
+  {
+    $group: {
+      _id: "$name",
+      total_transactions: { $sum: 1 }
+    }
+  },
+
+  {
+    $addFields: {
+      monthly_avg: { $divide: ["$total_transactions", 12] }
+    }
+  },
+
+  {
+    $addFields: {
+      category: {
+        $switch: {
+          branches: [
+            { case: { $lt: ["$monthly_avg", 2] }, then: "infrequent" },
+            {
+              case: {
+                $and: [
+                  { $gte: ["$monthly_avg", 2] },
+                  { $lte: ["$monthly_avg", 5] }
+                ]
+              },
+              then: "regular"
+            },
+            { case: { $gt: ["$monthly_avg", 5] }, then: "frequent" }
+          ],
+          default: "infrequent"
+        }
+      }
+    }
+  },
+
+  {
+    $project: {
+      _id: 0,
+      name: "$_id",
+      monthly_avg: { $round: ["$monthly_avg", 1] },
+      category: 1
+    }
+  }
+
+])
